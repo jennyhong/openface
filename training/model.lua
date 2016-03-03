@@ -29,6 +29,7 @@ function replaceModules(net, orig_class_name, replacer)
    end
 end
 
+-- use cudnn convert instead, recently released in cudnn
 function nn_to_cudnn(net)
    local net_cudnn = net:clone():float()
 
