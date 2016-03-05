@@ -19,9 +19,9 @@
 imgDim = 96
 
 function createModel()
-   local net = nn.Sequential()
+local net = nn.Sequential()
    local depths = torch.Tensor{8, 16, 32, 64, 64,
-                              64, 640}
+                              64, 640, 720, 736}
 
    -- Layer 1: Convolution with filter size 7, step size 2, padding 3
    -- Output size: 48 x 48 x depths[1] (width, height, depth)
@@ -66,6 +66,27 @@ function createModel()
    net:add(nn.SpatialConvolutionMM(depths[6], depths[7], 3, 3, 2, 2, 1, 1))
    net:add(nn.SpatialBatchNormalization(depths[7]))
    net:add(nn.ReLU())
+
+   -- Layer 22: Convolution with filter size 3, step size 2, padding 1
+   -- Output size: 3 x 3 x depths[8] (width, height, depth)
+   net:add(nn.SpatialConvolutionMM(depths[7], depths[8], 3, 3, 2, 2, 1, 1))
+   net:add(nn.SpatialBatchNormalization(depths[8]))
+   net:add(nn.ReLU())
+
+   -- Layer 22: Convolution with filter size 3, step size 1, padding 1
+   -- Output size: 3 x 3 x depths[9] (width, height, depth)
+   net:add(nn.SpatialConvolutionMM(depths[8], depths[9], 3, 3, 1, 1, 1, 1))
+   net:add(nn.SpatialBatchNormalization(depths[9]))
+   net:add(nn.ReLU())
+
+   net:add(nn.SpatialAveragePooling(3, 3))
+
+   -- Validate shape with:
+   -- net:add(nn.Reshape(736))
+
+   net:add(nn.View(depths[-1]))
+   net:add(nn.Linear(depths[-1], opt.embSize))
+   net:add(nn.Normalize(2))
 
    return net
 end
