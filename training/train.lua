@@ -35,7 +35,7 @@ trainLogger = optim.Logger(paths.concat(opt.save, 'train.log'))
 
 local batchNumber
 local triplet_loss
-
+local total_loss
 
 -- From https://groups.google.com/d/msg/torch7/i8sJYlgQPeA/wiHlPSa5-HYJ
 local function replaceModules(net, orig_class_name, replacer)
@@ -113,6 +113,7 @@ function train()
 
    local tm = torch.Timer()
    triplet_loss = 0
+   total_loss = 0
 
    local i = 1
    while batchNumber < opt.epochSize do
@@ -143,12 +144,15 @@ function train()
 
    triplet_loss = triplet_loss / batchNumber
 
+   -- trainLogger:add{
+   --    ['avg triplet loss (train set)'] = triplet_loss,
+   -- }
    trainLogger:add{
-      ['avg triplet loss (train set)'] = triplet_loss,
+      ['avg total loss (train set)'] = total_loss,
    }
    print(string.format('Epoch: [%d][TRAINING SUMMARY] Total Time(s): %.2f\t'
-                          .. 'average triplet loss (per batch): %.2f',
-                       epoch, tm:time().real, triplet_loss))
+                          .. 'average total loss (per batch): %.2f',
+                       epoch, tm:time().real, total_loss))
    print('\n')
 
    collectgarbage()
@@ -326,7 +330,6 @@ local optimator = FitNetsOptim(model, optimState)
 
 trainLogger = optim.Logger(paths.concat(opt.save, 'train.log'))
 
-local total_loss
 
 
 
@@ -358,11 +361,12 @@ function fitnetsTrainBatch(inputsThread, numPerClassThread)
   local student_embeddings = model:forward(inputs):float()
   local teacher_final_embeddings = teacher_model:forward(inputs):float()
   local teacher_middle_embeddings = teacher_model.modules[teacher_layer].output
-  local output = teacher_middle_embeddings
+  local target = teacher_middle_embeddings
+  local output = student_embeddings
 
   local criterion = nn.MSECriterion()
 
-  local err, _ = optimator:optimize(optimMethod, inputs, output, criterion)
+  local err, _ = optimator:optimize(optimMethod, inputs, output, target, criterion)
 
   -- DataParallelTable's syncParameters
   model:apply(function(m) if m.syncParameters then m:syncParameters() end end)

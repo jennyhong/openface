@@ -90,7 +90,8 @@ end
 if opt.cudnn then
    model = nn_to_cudnn(model)
 end
-criterion = nn.TripletEmbeddingCriterion(opt.alpha)
+-- criterion = nn.TripletEmbeddingCriterion(opt.alpha)
+criterion = nn.MSECriterion()
 
 if opt.cuda then
    model = model:cuda()

@@ -109,7 +109,7 @@ local function on_device_for_module(mod, f)
     return f()
 end
 
-function FitNetsOptim:optimize(optimMethod, inputs, output, criterion)
+function FitNetsOptim:optimize(optimMethod, inputs, output, target, criterion)
   assert(optimMethod)
   assert(inputs)
   assert(criterion)
@@ -118,8 +118,8 @@ function FitNetsOptim:optimize(optimMethod, inputs, output, criterion)
   self.model:zeroGradParameters()
 
   local numImages = inputs:size(1)
-  local err = criterion:forward(inputs, output)
-  local df_do = criterion:backward(inputs, output)
+  local err = criterion:forward(output, target)
+  local df_do = criterion:backward(output, target)
 
   -- is this right? I don't know what else we need for the gradient?
   gradient_all = df_do
