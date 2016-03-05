@@ -129,7 +129,7 @@ function train()
          end,
          -- the end callback (runs in the main thread)
          -- trainBatch
-         fitnetsTrainBatch
+         fitnetsTrainStudentMiddleLayerBatch
       )
       if i % 5 == 0 then
          donkeys:synchronize()
@@ -335,9 +335,9 @@ trainLogger = optim.Logger(paths.concat(opt.save, 'train.log'))
 
 
 teacher_model = torch.load('models/openface/nn4.small2.v1.t7')
-teacher_layer = 1
+teacher_layer = 17
 
-function fitnetsTrainBatch(inputsThread, numPerClassThread)
+function fitnetsTrainStudentMiddleLayerBatch(inputsThread, numPerClassThread)
   if batchNumber >= opt.epochSize then
     return
   end
@@ -365,7 +365,6 @@ function fitnetsTrainBatch(inputsThread, numPerClassThread)
   local output = student_embeddings
 
   local criterion = nn.MSECriterion()
-
   local err, _ = optimator:optimize(optimMethod, inputs, output, target, criterion)
 
   -- DataParallelTable's syncParameters

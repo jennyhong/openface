@@ -23,12 +23,13 @@ local optimator = FitNetsOptim(model, optimState)
 
 trainLogger = optim.Logger(paths.concat(opt.save, 'train.log'))
 
+local batchNumber
 local total_loss
 
 
 
 
-teacher_model = torch.load('models/openface/nn4.small2.v1.t7')
+teacher_model = torch.load('model/openface/nn4.small2.v1.t7')
 teacher_layer = 1
 
 function fitnetsTrainBatch(inputsThread, numPerClassThread)
