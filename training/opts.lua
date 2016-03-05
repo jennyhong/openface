@@ -27,8 +27,8 @@ function M.parse(arg)
                            -- 'dlib-affine-224-split'),
               'Home of dataset. Split into "train" and "val" directories that separate images by class.')
    cmd:option('-manualSeed', 2, 'Manually set RNG seed')
-   cmd:option('-cuda', true, 'Use cuda.')
-   cmd:option('-cudnn', true, 'Convert the model to cudnn.')
+   cmd:option('-cuda', false, 'Use cuda.')
+   cmd:option('-cudnn', false, 'Convert the model to cudnn.')
 
    ------------- Data options ------------------------
    cmd:option('-nDonkeys', 2, 'number of donkeys to initialize (data loading threads)')

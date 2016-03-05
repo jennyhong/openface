@@ -80,7 +80,7 @@ function createModel()
 
    net:add(nn.View(depths[-1]))
    net:add(nn.Linear(depths[-1], opt.embSize))
-   -- net:add(nn.Normalize(2))
+   net:add(nn.Normalize(2))
 
    return net
 end
