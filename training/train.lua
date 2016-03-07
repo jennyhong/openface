@@ -130,6 +130,7 @@ function train()
          -- the end callback (runs in the main thread)
          -- trainBatch
          fitnetsTrainStudentMiddleLayerBatch
+         -- fitnetsTrainStudentFinalLayerBatch
       )
       if i % 5 == 0 then
          donkeys:synchronize()
@@ -331,10 +332,7 @@ local optimator = FitNetsOptim(model, optimState)
 trainLogger = optim.Logger(paths.concat(opt.save, 'train.log'))
 
 
-
-
-
-teacher_model = torch.load('models/openface/nn4.small2.v1.t7')
+teacher_model = torch.load('../models/openface/nn4.small2.v1.t7')
 teacher_layer = 17
 
 function fitnetsTrainStudentMiddleLayerBatch(inputsThread, numPerClassThread)
@@ -377,4 +375,52 @@ function fitnetsTrainStudentMiddleLayerBatch(inputsThread, numPerClassThread)
         epoch, batchNumber, opt.epochSize, timer:time().real, err))
   timer:reset()
   total_loss = total_loss + err
+end
+
+function fitnetsTrainStudentFinalLayerBatch(inputsThread, numPerClassThread)
+  if batchNumber >= opt.epochSize then
+    return
+  end
+
+  if opt.cuda then
+    cutorch.synchronize()
+  end
+  timer:reset()
+  receiveTensor(inputsThread, inputsCPU)
+  receiveTensor(numPerClassThread, numPerClass)
+
+  local inputs
+  if opt.cuda then
+     inputs = inputsCPU:cuda()
+  else
+     inputs = inputsCPU
+  end
+
+  local numImages = inputs:size(1)
+
+  -- copy weights from pre-trained student_model to model
+  local student_model = torch.load('./work/2/model_1.t7')
+  for i = 1, student_model:size() do
+    model.modules[i].weight = student_model.modules[i].weight
+  end
+
+  local teacher_final_embeddings = teacher_model:forward(inputs):float()
+  local student_final_embeddings = model:forward(inputs):float()
+  local target = teacher_final_embeddings
+  local output = student_final_embeddings
+
+  local criterion = nn.MSECriterion() -- TODO: swap out for cross-entropy criterion
+  local err, _ = optimator:optimize(optimMethod, inputs, output, target, criterion)
+
+  -- DataParallelTable's syncParameters
+  model:apply(function(m) if m.syncParameters then m:syncParameters() end end)
+  if opt.cuda then
+     cutorch.synchronize()
+  end
+  batchNumber = batchNumber + 1
+  print(('Epoch: [%d][%d/%d]\tTime %.3f\ttotalErr %.2e'):format(
+        epoch, batchNumber, opt.epochSize, timer:time().real, err))
+  timer:reset()
+  total_loss = total_loss + err
+
 end
