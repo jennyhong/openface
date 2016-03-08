@@ -109,7 +109,7 @@ local function on_device_for_module(mod, f)
     return f()
 end
 
-function FitNetsOptim:optimize(optimMethod, inputs, output, target, criterion)
+function FitNetsOptim:optimizeMSE(optimMethod, inputs, output, target, criterion)
   assert(optimMethod)
   assert(inputs)
   assert(criterion)
@@ -121,9 +121,7 @@ function FitNetsOptim:optimize(optimMethod, inputs, output, target, criterion)
   local err = criterion:forward(output, target)
   local df_do = criterion:backward(output, target)
 
-  -- is this right? I don't know what else we need for the gradient?
   gradient_all = df_do
-
   self.model:backward(inputs, gradient_all)
 
   -- We'll set these in the loop that iterates over each module. Get them
@@ -155,4 +153,83 @@ function FitNetsOptim:optimize(optimMethod, inputs, output, target, criterion)
   end
 
   return err, output
+end
+
+-- This is a combination of FitNetsOptim:optimizeMSE and
+-- OpenFaceOptim:optimizeTriplet
+function FitNetsOptim:optimizeMixtureL2Triplet(optimMethod, modelInputs, modelOutputRaw, modelOutputTriplets, target, targetCriterion, facenetCriterion, mapper, lambda)
+
+-- optimMethod: optim.adagrad, for example -- any torch otpimization method
+-- modelInputs: the inputs to the model
+-- modelOutputRaw: the output to the model (e.g. a numImages x 128 tensor)
+-- modelOutputTriplets: the weird apn thing from the original train.lua, passed to facenetCriterion
+-- target: a tensor the same size as modelOutput (e.g. a numImages x 128 tensor)
+--         for our purposes, this is the output of the large teacher network, which is the
+--         same size as the output of our model (the student network)
+-- targetCriterion: how we compare the numImages x 128 tensor from the student network to the
+--                  numImages x 128 tensor from the teacher network. e.g. nn.MSECriterion
+-- facenetCriterion: computing our model error based on pairs.txt, as done in the facenet paper
+--                   i.e. nn.TripletEmbeddingCriterion
+-- mapper: maps triplet indices to the indices of the three images in the triplet
+--         used to compute gradient given the local gradient from facenetCriterion
+-- lambda: regularization parameter that trades off between using targetCriterion vs facenetCriterion
+
+  self.model:zeroGradParameters()
+
+  -- compute the error and gradient based on comparing the student network outputs
+  -- to the teacher network outputs
+  local numImages = modelInputs:size(1)
+  local target_err = targetCriterion:forward(modelOutputRaw, target)
+  local dtarget_do = targetCriterion:backward(modelOutputRaw, target)
+
+  -- compute the error of the student network based on its performance in grouping
+  -- the right faces together, per TripletEmbeddingCriterion
+  local triplet_err = facenetCriterion:forward(modelOutputTriplets)
+  local dtripleterr_do = facenetCriterion:backward(modelOutputTriplets)
+
+  --map gradient to the index of input
+  triplet_grad = torch.Tensor(numImages,modelOutputTriplets[1]:size(2)):type(modelInputs:type())
+  triplet_grad:zero()
+  --get all gradient for each example
+  for i=1,table.getn(mapper) do
+      triplet_grad[mapper[i][1]]:add(dtripleterr_do[1][i])
+      triplet_grad[mapper[i][2]]:add(dtripleterr_do[2][i])
+      triplet_grad[mapper[i][3]]:add(dtripleterr_do[3][i])
+  end
+
+  -- combine the two errors and gradients using lambda
+  err = lambda * target_err + (1 - lambda) * triplet_err
+  gradient_all = dtarget_do:mul(lambda) + triplet_grad:mul(1 - lambda)
+
+  self.model:backward(modelInputs, gradient_all)
+
+  -- We'll set these in the loop that iterates over each module. Get them
+  -- out here to be captured.
+  local curGrad
+  local curParam
+  local function fEvalMod(_)
+      return err, curGrad
+  end
+
+  for curMod, opt in pairs(self.modulesToOptState) do
+     on_device_for_module(curMod, function()
+          local curModParams = self.weight_bias_parameters(curMod)
+          -- expects either an empty table or 2 element table, one for weights
+          -- and one for biases
+          assert(pl.tablex.size(curModParams) == 0 or
+            pl.tablex.size(curModParams) == 2)
+          if curModParams then
+             for i, _ in ipairs(curModParams) do
+                if curModParams[i] then
+                   -- expect param, gradParam pair
+                   curParam, curGrad = table.unpack(curModParams[i])
+                   assert(curParam and curGrad)
+                   optimMethod(fEvalMod, curParam, opt[i])
+                  end
+              end
+          end
+     end)
+  end
+
+  return err, modelOutput
 end

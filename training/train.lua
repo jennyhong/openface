@@ -129,8 +129,9 @@ function train()
          end,
          -- the end callback (runs in the main thread)
          -- trainBatch
-         fitnetsTrainStudentMiddleLayerBatch
-         -- fitnetsTrainStudentFinalLayerBatch
+         -- fitnetsTrainStudentMiddleLayerBatch
+         -- fitnetsTrainStudentFinalLayerBatchMSEOnly
+         fitnetsTrainStudentFinalLayerBatchMSEandTriplets
       )
       if i % 5 == 0 then
          donkeys:synchronize()
@@ -325,7 +326,9 @@ end
 
 
 
-
+-----------------------------------------------------------------
+-- THIS IS FOR FITNETS TRAIN STUDENT MIDDLE LAYER
+-----------------------------------------------------------------
 
 local optimator = FitNetsOptim(model, optimState)
 
@@ -377,7 +380,11 @@ function fitnetsTrainStudentMiddleLayerBatch(inputsThread, numPerClassThread)
   total_loss = total_loss + err
 end
 
-function fitnetsTrainStudentFinalLayerBatch(inputsThread, numPerClassThread)
+----------------------------------------------------------------------------------------
+-- THIS IS FOR FITNETS TRAIN STUDENT FINAL LAYER USING ONLY MSECRITERION AGAINST TEACHER
+----------------------------------------------------------------------------------------
+
+function fitnetsTrainStudentFinalLayerBatchMSEOnly(inputsThread, numPerClassThread)
   if batchNumber >= opt.epochSize then
     return
   end
@@ -399,7 +406,7 @@ function fitnetsTrainStudentFinalLayerBatch(inputsThread, numPerClassThread)
   local numImages = inputs:size(1)
 
   -- copy weights from pre-trained student_model to model
-  local student_model = torch.load('./work/2/model_1.t7')
+  local student_model = torch.load('./work/1/model_1.t7')
   for i = 1, student_model:size() do
     model.modules[i].weight = student_model.modules[i].weight
   end
@@ -411,6 +418,145 @@ function fitnetsTrainStudentFinalLayerBatch(inputsThread, numPerClassThread)
 
   local criterion = nn.MSECriterion() -- TODO: swap out for cross-entropy criterion
   local err, _ = optimator:optimize(optimMethod, inputs, output, target, criterion)
+
+  -- DataParallelTable's syncParameters
+  model:apply(function(m) if m.syncParameters then m:syncParameters() end end)
+  if opt.cuda then
+     cutorch.synchronize()
+  end
+  batchNumber = batchNumber + 1
+  print(('Epoch: [%d][%d/%d]\tTime %.3f\ttotalErr %.2e'):format(
+        epoch, batchNumber, opt.epochSize, timer:time().real, err))
+  timer:reset()
+  total_loss = total_loss + err
+
+end
+
+-------------------------------------------------------------------------------------------------
+-- THIS IS FOR FITNETS TRAIN STUDENT FINAL LAYER USING MSECRITERION AND TRIPLETEMBEDDINGCRITERION
+-------------------------------------------------------------------------------------------------
+function fitnetsTrainStudentFinalLayerBatchMSEandTriplets(inputsThread, numPerClassThread)
+  if batchNumber >= opt.epochSize then
+    return
+  end
+
+  if opt.cuda then
+    cutorch.synchronize()
+  end
+  timer:reset()
+  receiveTensor(inputsThread, inputsCPU)
+  receiveTensor(numPerClassThread, numPerClass)
+
+  local inputs
+  if opt.cuda then
+     inputs = inputsCPU:cuda()
+  else
+     inputs = inputsCPU
+  end
+
+  local numImages = inputs:size(1)
+
+  -- copy weights from pre-trained student_model (fitnets1) to model (fitnetsall)
+  local student_model = torch.load('./work-firsthalf/model_1.t7')
+  for i = 1, student_model:size() do
+    model.modules[i].weight = student_model.modules[i].weight
+  end
+
+  local teacher_final_embeddings = teacher_model:forward(inputs):float()
+  local student_final_embeddings = model:forward(inputs):float()
+  local target = teacher_final_embeddings
+  -- local output_raw = student_final_embeddings
+
+  local as_table = {}
+  local ps_table = {}
+  local ns_table = {}
+  local triplet_idx = {}
+  local num_example_per_idx = torch.Tensor(student_final_embeddings:size(1))
+  num_example_per_idx:zero()
+
+  local tripIdx = 1
+  local embStartIdx = 1
+  local numTrips = 0
+  for i = 1,opt.peoplePerBatch do
+    local n = numPerClass[i]
+    for j = 1,n-1 do -- For every image in the batch.
+      local aIdx = embStartIdx + j - 1
+      local diff = student_final_embeddings - student_final_embeddings[{ {aIdx} }]:expandAs(student_final_embeddings)
+      local norms = diff:norm(2, 2):pow(2):squeeze()
+      for pair = j, n-1 do -- For every possible positive pair.
+        local pIdx = embStartIdx + pair
+
+        local fff = (student_final_embeddings[aIdx]-student_final_embeddings[pIdx]):norm(2)
+        local normsP = norms - torch.Tensor(student_final_embeddings:size(1)):fill(fff*fff)
+
+        -- Set the indices of the same class to the max so they are ignored.
+        normsP[{{embStartIdx,embStartIdx +n-1}}] = normsP:max()
+
+        -- Get indices of images within the margin.
+        local in_margin = normsP:lt(opt.alpha)
+        local allNeg = torch.find(in_margin, 1)
+
+        -- Use only non-random triplets.
+        -- Random triples (which are beyond the margin) will just produce gradient = 0,
+        -- so the average gradient will decrease.
+        if table.getn(allNeg) ~= 0 then
+          selNegIdx = allNeg[math.random (table.getn(allNeg))]
+          -- Add the embeding of each example.
+          table.insert(as_table,student_final_embeddings[aIdx])
+          table.insert(ps_table,student_final_embeddings[pIdx])
+          table.insert(ns_table,student_final_embeddings[selNegIdx])
+          -- Add the original index of triplets.
+          table.insert(triplet_idx, {aIdx,pIdx,selNegIdx})
+          -- Increase the number of times of using each example.
+          num_example_per_idx[aIdx] = num_example_per_idx[aIdx] + 1
+          num_example_per_idx[pIdx] = num_example_per_idx[pIdx] + 1
+          num_example_per_idx[selNegIdx] = num_example_per_idx[selNegIdx] + 1
+          tripIdx = tripIdx + 1
+        end
+
+        numTrips = numTrips + 1
+      end
+    end
+    embStartIdx = embStartIdx + n
+  end
+  assert(embStartIdx - 1 == numImages)
+  local nTripsFound = table.getn(as_table)
+  print(('  + (nTrips, nTripsFound) = (%d, %d)'):format(numTrips, nTripsFound))
+
+  if nTripsFound == 0 then
+     print("Warning: nTripsFound == 0. Skipping batch.")
+     return
+  end
+
+  local as = torch.concat(as_table):view(table.getn(as_table), opt.embSize)
+  local ps = torch.concat(ps_table):view(table.getn(ps_table), opt.embSize)
+  local ns = torch.concat(ns_table):view(table.getn(ns_table), opt.embSize)
+
+  local apn
+  if opt.cuda then
+     local asCuda = torch.CudaTensor()
+     local psCuda = torch.CudaTensor()
+     local nsCuda = torch.CudaTensor()
+
+     local sz = as:size()
+     asCuda:resize(sz):copy(as)
+     psCuda:resize(sz):copy(ps)
+     nsCuda:resize(sz):copy(ns)
+
+     apn = {asCuda, psCuda, nsCuda}
+  else
+     apn = {as, ps, ns}
+  end
+
+  local targetCriterion = nn.MSECriterion()
+  local facenetCriterion = nn.TripletEmbeddingCriterion(opt.alpha)
+
+  local output_raw = student_final_embeddings
+  local output_triplet = apn
+  local mapper = triplet_idx
+  local lambda = 0.2
+  local err, _ = optimator:optimizeMixtureL2Triplet(optimMethod, inputs, output_raw, output_triplet,
+                target, targetCriterion, facenetCriterion, mapper, lambda)
 
   -- DataParallelTable's syncParameters
   model:apply(function(m) if m.syncParameters then m:syncParameters() end end)
