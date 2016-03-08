@@ -39,6 +39,10 @@ end
 
 epoch = opt.epochNumber
 
+if opt.trainFullStudent then
+  assert(opt.firstHalfCached)
+end
+
 for _=1,opt.nEpochs do
    train()
    epoch = epoch + 1

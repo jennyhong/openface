@@ -90,8 +90,13 @@ end
 if opt.cudnn then
    model = nn_to_cudnn(model)
 end
-criterion = nn.TripletEmbeddingCriterion(opt.alpha)
--- criterion = nn.MSECriterion()
+if opt.trainFullStudent then
+  criterion = nn.TripletEmbeddingCriterion(opt.alpha)
+elseif opt.trainFirstHalf then
+  criterion = nn.MSECriterion()
+end
+
+for k,v in pairs(opt) do print(k,v) end
 
 if opt.cuda then
    model = model:cuda()

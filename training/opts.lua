@@ -47,6 +47,10 @@ function M.parse(arg)
    cmd:option('-imgDim', 96, 'Image dimension. nn2=224, nn4=96')
    cmd:option('-embSize', 128, 'size of embedding from model')
    cmd:option('-alpha', 0.2, 'margin in TripletLoss')
+   ---------- Fitnets options --------------------------------
+   cmd:option('-trainFirstHalf', false, 'train first half of student model against first half of teacher')
+   cmd:option('-trainFullStudent', false, 'train the full student network, using params from an already trained first half')
+   cmd:option('-firstHalfCached', '', 'file that stores the trained params for the first half of the student model')
    cmd:text()
 
    local opt = cmd:parse(arg or {})

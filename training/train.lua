@@ -115,6 +115,13 @@ function train()
    triplet_loss = 0
    total_loss = 0
 
+   if opt.trainFullStudent then
+    -- trainBatchMethod = fitnetsTrainStudentFinalLayerBatchMSEOnly
+    trainBatchMethod = fitnetsTrainStudentFinalLayerBatchMSEandTriplets
+   elseif opt.trainFirstHalf then
+    trainBatchMethod = fitnetsTrainStudentMiddleLayerBatch
+   end
+
    local i = 1
    while batchNumber < opt.epochSize do
       -- queue jobs to data-workers
@@ -129,9 +136,7 @@ function train()
          end,
          -- the end callback (runs in the main thread)
          -- trainBatch
-         -- fitnetsTrainStudentMiddleLayerBatch
-         -- fitnetsTrainStudentFinalLayerBatchMSEOnly
-         fitnetsTrainStudentFinalLayerBatchMSEandTriplets
+         trainBatchMethod
       )
       if i % 5 == 0 then
          donkeys:synchronize()
@@ -366,7 +371,7 @@ function fitnetsTrainStudentMiddleLayerBatch(inputsThread, numPerClassThread)
   local output = student_embeddings
 
   local criterion = nn.MSECriterion()
-  local err, _ = optimator:optimize(optimMethod, inputs, output, target, criterion)
+  local err, _ = optimator:optimizeMSE(optimMethod, inputs, output, target, criterion)
 
   -- DataParallelTable's syncParameters
   model:apply(function(m) if m.syncParameters then m:syncParameters() end end)
@@ -457,7 +462,8 @@ function fitnetsTrainStudentFinalLayerBatchMSEandTriplets(inputsThread, numPerCl
   local numImages = inputs:size(1)
 
   -- copy weights from pre-trained student_model (fitnets1) to model (fitnetsall)
-  local student_model = torch.load('./work-firsthalf/model_1.t7')
+  local student_model = torch.load(opt.firstHalfCached)
+  -- local student_model = torch.load('./work-firsthalf/model_1.t7')
   for i = 1, student_model:size() do
     model.modules[i].weight = student_model.modules[i].weight
   end
