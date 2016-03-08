@@ -7,8 +7,10 @@ MODEL_DIR=../models/fitnets
 WORK_DIR=work-firsthalf
 FINAL_WORK_DIR=work-wholefitnet
 NEPOCHS=3
-
 USE_GPU=false
+if $USE_GPU ; then
+  NEPOCHS=1000
+fi
 
 rm -r $WORK_DIR*
 rm -r $FINAL_WORK_DIR*
