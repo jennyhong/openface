@@ -464,7 +464,8 @@ function fitnetsTrainStudentFinalLayerBatchMSEandTriplets(inputsThread, numPerCl
   -- copy weights from pre-trained student_model (fitnets1) to model (fitnetsall)
   local student_model = torch.load(opt.firstHalfCached)
   -- local student_model = torch.load('./work-firsthalf/model_1.t7')
-  for i = 1, student_model:size() do
+  -- for i = 1, student_model:size() do
+  for i = 1, student_model:size()-1 do
     model.modules[i].weight = student_model.modules[i].weight
   end
 
