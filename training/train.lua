@@ -336,6 +336,7 @@ end
 -----------------------------------------------------------------
 
 local optimator = FitNetsOptim(model, optimState)
+local openface_optimator = OpenFaceOptim(model, optimState)
 
 trainLogger = optim.Logger(paths.concat(opt.save, 'train.log'))
 
@@ -562,8 +563,12 @@ function fitnetsTrainStudentFinalLayerBatchMSEandTriplets(inputsThread, numPerCl
   local output_triplet = apn
   local mapper = triplet_idx
   local lambda = 0.2
-  local err, _ = optimator:optimizeMixtureL2Triplet(optimMethod, inputs, output_raw, output_triplet,
-                target, targetCriterion, facenetCriterion, mapper, lambda)
+  -- local err, _ = optimator:optimizeMixtureL2Triplet(optimMethod, inputs, output_raw, output_triplet,
+                -- target, targetCriterion, facenetCriterion, mapper, lambda)
+  local err, _ = openface_optimator:optimizeTriplet(
+     optimMethod, inputs, apn, facenetCriterion,
+     triplet_idx -- , num_example_per_idx
+  )
 
   -- DataParallelTable's syncParameters
   model:apply(function(m) if m.syncParameters then m:syncParameters() end end)
