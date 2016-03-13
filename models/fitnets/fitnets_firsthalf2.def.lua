@@ -1,4 +1,4 @@
--- Model: fitnets1.def.lua
+-- Model: fitnets_firsthalf2.def.lua
 -- Description: Student network for FitNets branch
 -- Input size: 3x96x96
 -- Components: Mostly `nn`
@@ -40,29 +40,32 @@ function createModel()
    net:add(nn.SpatialBatchNormalization(depths[3]))
    net:add(nn.ReLU())
 
-   -- Layer 10: Convolution with filter size 5, step size 1, padding 2
-   -- Output size: 24 x 24 x depths[4] (width, height, depth)
-   net:add(nn.SpatialConvolutionMM(depths[3], depths[4], 5, 5, 1, 1, 2, 2))
+   -- Layer 10: Convolution with filter size 5, step size 2, padding 2
+   -- Output size: 12 x 12 x depths[4] (width, height, depth)
+   net:add(nn.SpatialConvolutionMM(depths[3], depths[4], 5, 5, 2, 2, 2, 2))
    net:add(nn.SpatialBatchNormalization(depths[4]))
    net:add(nn.ReLU())
 
    -- Layer 13: Convolution with filter size 5, step size 2, padding 2
-   -- Output size: 12 x 12 x depths[5] (width, height, depth)
+   -- Output size: 6 x 6 x depths[5] (width, height, depth)
    net:add(nn.SpatialConvolutionMM(depths[4], depths[5], 5, 5, 2, 2, 2, 2))
    net:add(nn.SpatialBatchNormalization(depths[5]))
    net:add(nn.ReLU())
 
    -- Layer 16: Convolution with filter size 3, step size 1, padding 1
-   -- Output size: 12 x 12 x depths[6] (width, height, depth)
+   -- Output size: 6 x 6 x depths[6] (width, height, depth)
    net:add(nn.SpatialConvolutionMM(depths[5], depths[6], 3, 3, 1, 1, 1, 1))
    net:add(nn.SpatialBatchNormalization(depths[6]))
    net:add(nn.ReLU())
 
-   net:add(nn.Reshape(9216))
+   -- REGRESSOR LAYER
+   net:add(nn.SpatialConvolutionMM(depths[6], 640, 1, 1, 1, 1, 0, 0))
+
+   -- net:add(nn.Reshape(9216))
 
    -- 6 * 6 * 640 = 23040
    -- 12 * 12 * 64 = 9216
-   net:add(nn.Linear(9216, 23040))
+   -- net:add(nn.Linear(9216, 23040))
 
    return net
 end

@@ -17,7 +17,7 @@
 -- limitations under the License.
 
 imgDim = 96
-
+-- 116428 parameters
 function createModel()
    local net = nn.Sequential()
    local depths = torch.Tensor{8, 8, 16, 24, 28, 32, 36, 36, 48, 64}
@@ -64,13 +64,13 @@ function createModel()
    net:add(nn.SpatialBatchNormalization(depths[7]))
    net:add(nn.ReLU())
 
-   -- Output size: 3 x 3 x depths[8] (width, height, depth)
-   net:add(nn.SpatialConvolutionMM(depths[7], depths[8], 3, 3, 2, 2, 1, 1))
+   -- Output size: 6 x 6 x depths[8] (width, height, depth)
+   net:add(nn.SpatialConvolutionMM(depths[7], depths[8], 3, 3, 1, 1, 1, 1))
    net:add(nn.SpatialBatchNormalization(depths[8]))
    net:add(nn.ReLU())
 
    -- Output size: 3 x 3 x depths[9] (width, height, depth)
-   net:add(nn.SpatialConvolutionMM(depths[8], depths[9], 3, 3, 1, 1, 1, 1))
+   net:add(nn.SpatialConvolutionMM(depths[8], depths[9], 3, 3, 2, 2, 1, 1))
    net:add(nn.SpatialBatchNormalization(depths[9]))
    net:add(nn.ReLU())
 

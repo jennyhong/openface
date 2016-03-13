@@ -1,4 +1,4 @@
--- Model: fitnets_firsthalf5.def.lua
+-- Model: fitnets_firsthalf8.def.lua
 -- Description: Student network for FitNets branch
 -- Input size: 3x96x96
 -- Components: Mostly `nn`
@@ -53,17 +53,19 @@ function createModel()
    net:add(nn.ReLU())
 
    -- Layer 16: Convolution with filter size 3, step size 1, padding 1
-   -- Output size: 3 x 3 x depths[6] (width, height, depth)
-   net:add(nn.SpatialConvolutionMM(depths[5], depths[6], 3, 3, 2, 2, 1, 1))
+   -- Output size: 6 x 6 x depths[6] (width, height, depth)
+   net:add(nn.SpatialConvolutionMM(depths[5], depths[6], 3, 3, 1, 1, 1, 1))
    net:add(nn.SpatialBatchNormalization(depths[6]))
    net:add(nn.ReLU())
 
+   -- REGRESSOR LAYER
+   net:add(nn.SpatialConvolutionMM(depths[6], 640, 1, 1, 1, 1, 0, 0))
 
-   net:add(nn.Reshape(162))
+   -- net:add(nn.Reshape(162))
 
-   -- 6 * 6 * 640 = 23040
-   -- 3 * 3 * 18 = 162
-   net:add(nn.Linear(162, 23040))
+   -- -- 6 * 6 * 640 = 23040
+   -- -- 3 * 3 * 18 = 162
+   -- net:add(nn.Linear(162, 23040))
 
    return net
 end

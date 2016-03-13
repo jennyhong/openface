@@ -1,4 +1,4 @@
--- Model: fitnets1.def.lua
+-- Model: fitnets_all2.def.lua
 -- Description: Student network for FitNets branch
 -- Input size: 3x96x96
 -- Components: Mostly `nn`
@@ -17,11 +17,12 @@
 -- limitations under the License.
 
 imgDim = 96
-
+-- 624480 parameters
 function createModel()
 local net = nn.Sequential()
    local depths = torch.Tensor{8, 16, 32, 64, 64,
                               64, 96, 128, 192}
+
 
    -- Layer 1: Convolution with filter size 7, step size 2, padding 3
    -- Output size: 48 x 48 x depths[1] (width, height, depth)
@@ -41,29 +42,27 @@ local net = nn.Sequential()
    net:add(nn.SpatialBatchNormalization(depths[3]))
    net:add(nn.ReLU())
 
-   -- Layer 10: Convolution with filter size 5, step size 1, padding 2
-   -- Output size: 24 x 24 x depths[4] (width, height, depth)
-   net:add(nn.SpatialConvolutionMM(depths[3], depths[4], 5, 5, 1, 1, 2, 2))
+   -- Layer 10: Convolution with filter size 5, step size 2, padding 2
+   -- Output size: 12 x 12 x depths[4] (width, height, depth)
+   net:add(nn.SpatialConvolutionMM(depths[3], depths[4], 5, 5, 2, 2, 2, 2))
    net:add(nn.SpatialBatchNormalization(depths[4]))
    net:add(nn.ReLU())
 
    -- Layer 13: Convolution with filter size 5, step size 2, padding 2
-   -- Output size: 12 x 12 x depths[5] (width, height, depth)
+   -- Output size: 6 x 6 x depths[5] (width, height, depth)
    net:add(nn.SpatialConvolutionMM(depths[4], depths[5], 5, 5, 2, 2, 2, 2))
    net:add(nn.SpatialBatchNormalization(depths[5]))
    net:add(nn.ReLU())
 
    -- Layer 16: Convolution with filter size 3, step size 1, padding 1
-   -- Output size: 12 x 12 x depths[6] (width, height, depth)
-   -- Require depths[6] == 320 to match parent without regressor layer
+   -- Output size: 6 x 6 x depths[6] (width, height, depth)
    net:add(nn.SpatialConvolutionMM(depths[5], depths[6], 3, 3, 1, 1, 1, 1))
    net:add(nn.SpatialBatchNormalization(depths[6]))
    net:add(nn.ReLU())
 
-   -- Layer 19: Convolution with filter size 3, step size 2, padding 1
+   -- Layer 19: Convolution with filter size 3, step size 1, padding 1
    -- Output size: 6 x 6 x depths[7] (width, height, depth)
-   -- require depths[7] == 640 to match parent without regressor layer
-   net:add(nn.SpatialConvolutionMM(depths[6], depths[7], 3, 3, 2, 2, 1, 1))
+   net:add(nn.SpatialConvolutionMM(depths[6], depths[7], 3, 3, 1, 1, 1, 1))
    net:add(nn.SpatialBatchNormalization(depths[7]))
    net:add(nn.ReLU())
 
@@ -80,9 +79,6 @@ local net = nn.Sequential()
    net:add(nn.ReLU())
 
    net:add(nn.SpatialAveragePooling(3, 3))
-
-   -- Validate shape with:
-   -- net:add(nn.Reshape(736))
 
    net:add(nn.View(depths[-1]))
    net:add(nn.Linear(depths[-1], opt.embSize))

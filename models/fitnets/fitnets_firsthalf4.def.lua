@@ -64,16 +64,19 @@ function createModel()
    net:add(nn.SpatialBatchNormalization(depths[7]))
    net:add(nn.ReLU())
 
-   -- Output size: 3 x 3 x depths[7] (width, height, depth)
-   net:add(nn.SpatialConvolutionMM(depths[7], depths[8], 3, 3, 2, 2, 1, 1))
+   -- Output size: 6 x 6 x depths[7] (width, height, depth)
+   net:add(nn.SpatialConvolutionMM(depths[7], depths[8], 3, 3, 1, 1, 1, 1))
    net:add(nn.SpatialBatchNormalization(depths[8]))
    net:add(nn.ReLU())
 
-   net:add(nn.Reshape(324))
+   -- REGRESSOR LAYER
+   net:add(nn.SpatialConvolutionMM(depths[8], 640, 1, 1, 1, 1, 0, 0))
 
-   -- 6 * 6 * 640 = 23040
-   -- 3 * 3 * 36 = 324
-   net:add(nn.Linear(324, 23040))
+   -- net:add(nn.Reshape(324))
+
+   -- -- 6 * 6 * 640 = 23040
+   -- -- 3 * 3 * 36 = 324
+   -- net:add(nn.Linear(324, 23040))
 
    return net
 end
