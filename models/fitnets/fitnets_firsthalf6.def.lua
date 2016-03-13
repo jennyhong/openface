@@ -1,4 +1,4 @@
--- Model: fitnets_all5.def.lua
+-- Model: fitnets_firsthalf5.def.lua
 -- Description: Student network for FitNets branch
 -- Input size: 3x96x96
 -- Components: Mostly `nn`
@@ -17,13 +17,10 @@
 -- limitations under the License.
 
 imgDim = 96
--- 183224 parameters
+
 function createModel()
    local net = nn.Sequential()
-   -- The depths are the same as in fitnets_all3.def.lua
-   -- The only difference is the filter sizes are smaller
-   -- The depths are all the same.
-   local depths = torch.Tensor{8, 16, 24, 28, 32, 36, 48, 64, 128}
+   local depths = torch.Tensor{8, 16, 24, 28, 32, 36, 40, 44, 48}
 
    -- Layer 1: Convolution with filter size 5, step size 2, padding 2
    -- Output size: 48 x 48 x depths[1] (width, height, depth)
@@ -61,32 +58,11 @@ function createModel()
    net:add(nn.SpatialBatchNormalization(depths[6]))
    net:add(nn.ReLU())
 
-   -- Layer 19: Convolution with filter size 3, step size 1, padding 1
-   -- Output size: 3 x 3 x depths[7] (width, height, depth)
-   net:add(nn.SpatialConvolutionMM(depths[6], depths[7], 3, 3, 1, 1, 1, 1))
-   net:add(nn.SpatialBatchNormalization(depths[7]))
-   net:add(nn.ReLU())
+   net:add(nn.Reshape(324))
 
-   -- Layer 22: Convolution with filter size 3, step size 2, padding 1
-   -- Output size: 3 x 3 x depths[8] (width, height, depth)
-   net:add(nn.SpatialConvolutionMM(depths[7], depths[8], 3, 3, 1, 1, 1, 1))
-   net:add(nn.SpatialBatchNormalization(depths[8]))
-   net:add(nn.ReLU())
-
-   -- Layer 22: Convolution with filter size 3, step size 1, padding 1
-   -- Output size: 3 x 3 x depths[9] (width, height, depth)
-   net:add(nn.SpatialConvolutionMM(depths[8], depths[9], 3, 3, 1, 1, 1, 1))
-   net:add(nn.SpatialBatchNormalization(depths[9]))
-   net:add(nn.ReLU())
-
-   net:add(nn.SpatialAveragePooling(3, 3))
-
-   -- Validate shape with:
-   -- net:add(nn.Reshape(736))
-
-   net:add(nn.View(depths[-1]))
-   net:add(nn.Linear(depths[-1], opt.embSize))
-   net:add(nn.Normalize(2))
+   -- 6 * 6 * 640 = 23040
+   -- 3 * 3 * 36 = 324
+   net:add(nn.Linear(324, 23040))
 
    return net
 end

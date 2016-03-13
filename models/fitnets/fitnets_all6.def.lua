@@ -17,13 +17,12 @@
 -- limitations under the License.
 
 imgDim = 96
--- 183224 parameters
+-- 103540 parameters
 function createModel()
    local net = nn.Sequential()
-   -- The depths are the same as in fitnets_all3.def.lua
-   -- The only difference is the filter sizes are smaller
-   -- The depths are all the same.
-   local depths = torch.Tensor{8, 16, 24, 28, 32, 36, 48, 64, 128}
+   -- The depths are the same as in fitnets_all5.def.lua
+   -- The only difference is the depths.
+   local depths = torch.Tensor{8, 16, 24, 28, 32, 36, 40, 44, 48}
 
    -- Layer 1: Convolution with filter size 5, step size 2, padding 2
    -- Output size: 48 x 48 x depths[1] (width, height, depth)
@@ -80,9 +79,6 @@ function createModel()
    net:add(nn.ReLU())
 
    net:add(nn.SpatialAveragePooling(3, 3))
-
-   -- Validate shape with:
-   -- net:add(nn.Reshape(736))
 
    net:add(nn.View(depths[-1]))
    net:add(nn.Linear(depths[-1], opt.embSize))
